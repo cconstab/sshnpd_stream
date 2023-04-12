@@ -57,7 +57,7 @@ void main(List<String> args) async {
     }
 
     // Add a namespace separator just cause its neater.
-    nameSpace = '$atSign.$nameSpace';
+    
   } catch (e) {
     version();
     stdout.writeln(parser.usage);
@@ -112,14 +112,15 @@ void main(List<String> args) async {
   }
   logger.info("Initial sync complete");
 
-  notificationService.subscribe(regex: '@', shouldDecrypt: true).listen(((notification) async {
-    logger.info('Received  notification');
+  notificationService.subscribe(regex: 'stream@', shouldDecrypt: true).listen(((notification) async {
+    // String notificationKey = notification.key
+    //     .replaceAll('${notification.to}:', '')
+    //     .replaceAll('.$nameSpace${notification.from}', '')
+    //     // convert to lower case as the latest AtClient converts notification
+    //     // keys to lower case when received
+    //     .toLowerCase();
     print(notification.key.toString());
-    if (notification.value == 'stream') {
-      logger.info('Session  connected successfully');
-    } else {
-      stderr.writeln('Remote sshnpd error: ${notification.value}');
-    }
+    print(notification.toString());
   }));
 }
 
