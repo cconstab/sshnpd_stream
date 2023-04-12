@@ -1,6 +1,7 @@
 // dart packages
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 
 // atPlatform packages
 import 'package:at_client/at_client.dart';
@@ -37,13 +38,9 @@ void main(List<String> args) async {
   var parser = ArgParser();
   // Basic arguments
   parser.addOption('key-file',
-      abbr: 'k',
-      mandatory: false,
-      help: 'Sending atSign\'s atKeys file if not in ~/.atsign/keys/');
-  parser.addOption('atsign',
-      abbr: 'a', mandatory: true, help: 'atSign for service');
-  parser.addOption('ip',
-      abbr: 'i', mandatory: true, help: 'IP address to send to clients');
+      abbr: 'k', mandatory: false, help: 'Sending atSign\'s atKeys file if not in ~/.atsign/keys/');
+  parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'atSign for service');
+  parser.addOption('ip', abbr: 'i', mandatory: true, help: 'IP address to send to clients');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
 
   try {
@@ -74,6 +71,7 @@ void main(List<String> args) async {
   // Loging setup
   // Now on to the atPlatform startup
   AtSignLogger.root_level = 'WARNING';
+  logger.logger.level = Level.WARNING;
   if (results['verbose']) {
     logger.logger.level = Level.INFO;
 
@@ -93,8 +91,7 @@ void main(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..atProtocolEmitted = Version(2, 0, 0);
 
-  AtOnboardingService onboardingService =
-      AtOnboardingServiceImpl(atSign, atOnboardingConfig);
+  AtOnboardingService onboardingService = AtOnboardingServiceImpl(atSign, atOnboardingConfig);
 
   await onboardingService.authenticate();
 
@@ -119,16 +116,12 @@ void main(List<String> args) async {
   }
   logger.info("Initial sync complete");
 
-  notificationService
-      .subscribe(regex: 'stream@', shouldDecrypt: true)
-      .listen(((notification) async {
+  notificationService.subscribe(regex: 'stream@', shouldDecrypt: true).listen(((notification) async {
     print(notification.key);
     if (notification.key.contains('stream')) {
-      logger.info(
-          'Setting stream session ${notification.value} for ${notification.from}');
-
       var ports = await connectSpawn(0, 0);
 
+      logger.warning('Setting stream session ${notification.value} for ${notification.from} using ports $ports');
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
@@ -142,8 +135,11 @@ void main(List<String> args) async {
         ..namespace = nameSpace
         ..metadata = metaData;
 
+      String data = '$ipAddress,${ports[0]},${ports[1]}';
+      print(atKey.toString());
+      print(data);
       try {
-        await atClient.put(atKey, ports.toString());
+        await atClient.put(atKey, data);
       } catch (e) {
         stderr.writeln("Error writting session ${notification.value} atKey");
       }
