@@ -30,14 +30,20 @@ void main(List<String> args) async {
   String? homeDirectory = getHomeDirectory();
   dynamic results;
   String atsignFile;
+  String ipAddress;
   String nameSpace = 'stream';
 
   // Get the command line arguments to fill in the details
   var parser = ArgParser();
   // Basic arguments
   parser.addOption('key-file',
-      abbr: 'k', mandatory: false, help: 'Sending atSign\'s atKeys file if not in ~/.atsign/keys/');
-  parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'atSign for service');
+      abbr: 'k',
+      mandatory: false,
+      help: 'Sending atSign\'s atKeys file if not in ~/.atsign/keys/');
+  parser.addOption('atsign',
+      abbr: 'a', mandatory: true, help: 'atSign for service');
+  parser.addOption('ip',
+      abbr: 'i', mandatory: true, help: 'IP address to send to clients');
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
 
   try {
@@ -45,6 +51,7 @@ void main(List<String> args) async {
     results = parser.parse(args);
     // Find atSign key file
     atSign = results['atsign'];
+    ipAddress = results['ip'];
     if (results['key-file'] != null) {
       atsignFile = results['key-file'];
     } else {
@@ -57,7 +64,6 @@ void main(List<String> args) async {
     }
 
     // Add a namespace separator just cause its neater.
-    nameSpace = '$atSign.$nameSpace';
   } catch (e) {
     version();
     stdout.writeln(parser.usage);
@@ -87,7 +93,8 @@ void main(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..atProtocolEmitted = Version(2, 0, 0);
 
-  AtOnboardingService onboardingService = AtOnboardingServiceImpl(atSign, atOnboardingConfig);
+  AtOnboardingService onboardingService =
+      AtOnboardingServiceImpl(atSign, atOnboardingConfig);
 
   await onboardingService.authenticate();
 
@@ -112,13 +119,36 @@ void main(List<String> args) async {
   }
   logger.info("Initial sync complete");
 
-  notificationService.subscribe(regex: '@', shouldDecrypt: true).listen(((notification) async {
-    logger.info('Received  notification');
-    print(notification.key.toString());
-    if (notification.value == 'stream') {
-      logger.info('Session  connected successfully');
+  notificationService
+      .subscribe(regex: 'stream@', shouldDecrypt: true)
+      .listen(((notification) async {
+    print(notification.key);
+    if (notification.key.contains('stream')) {
+      logger.info(
+          'Setting stream session ${notification.value} for ${notification.from}');
+
+      var ports = await connectSpawn(0, 0);
+
+      var metaData = Metadata()
+        ..isPublic = false
+        ..isEncrypted = true
+        ..ttl = 10000
+        ..namespaceAware = true;
+
+      var atKey = AtKey()
+        ..key = notification.value
+        ..sharedBy = atSign
+        ..sharedWith = notification.from
+        ..namespace = nameSpace
+        ..metadata = metaData;
+
+      try {
+        await atClient.put(atKey, ports.toString());
+      } catch (e) {
+        stderr.writeln("Error writting session ${notification.value} atKey");
+      }
     } else {
-      stderr.writeln('Remote sshnpd error: ${notification.value}');
+      stderr.writeln('Unknown error: ${notification.value}');
     }
   }));
 }
