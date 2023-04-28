@@ -131,6 +131,7 @@ void main(List<String> args) async {
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
+        ..ttr = -1
         ..ttl = 10000
         ..namespaceAware = true;
 
@@ -147,6 +148,7 @@ void main(List<String> args) async {
       try {
         await atClient.notificationService.notify(NotificationParams.forUpdate(atKey, value: data),waitForFinalDeliveryStatus: false,
           checkForFinalDeliveryStatus: false);
+
       } catch (e) {
         stderr.writeln("Error writting session ${notification.value} atKey");
       }
