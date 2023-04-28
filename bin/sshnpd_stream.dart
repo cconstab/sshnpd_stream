@@ -145,7 +145,8 @@ void main(List<String> args) async {
       print(atKey.toString());
       print(data);
       try {
-        await atClient.put(atKey, data);
+        await atClient.notificationService.notify(NotificationParams.forUpdate(atKey, value: data),waitForFinalDeliveryStatus: false,
+          checkForFinalDeliveryStatus: false);
       } catch (e) {
         stderr.writeln("Error writting session ${notification.value} atKey");
       }
