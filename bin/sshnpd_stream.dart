@@ -16,6 +16,7 @@ import 'package:socket_connector/socket_connector.dart';
 import 'package:version/version.dart';
 
 // local packages
+import 'package:sshnpd_stream/service_factories.dart';
 import 'package:sshnpd_stream/version.dart';
 import 'package:sshnpd_stream/home_directory.dart';
 import 'package:sshnpd_stream/check_file_exists.dart';
@@ -78,6 +79,11 @@ void main(List<String> args) async {
     AtSignLogger.root_level = 'INFO';
   }
 
+    AtServiceFactory? atServiceFactory;
+
+    atServiceFactory = ServiceFactoryWithNoOpSyncService();
+
+
   //onboarding preference builder can be used to set onboardingService parameters
   AtOnboardingPreference atOnboardingConfig = AtOnboardingPreference()
     //..qrCodePath = '<location of image>'
@@ -91,7 +97,7 @@ void main(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..atProtocolEmitted = Version(2, 0, 0);
 
-  AtOnboardingService onboardingService = AtOnboardingServiceImpl(atSign, atOnboardingConfig);
+  AtOnboardingService onboardingService = AtOnboardingServiceImpl(atSign, atOnboardingConfig,atServiceFactory: atServiceFactory);
 
   await onboardingService.authenticate();
 
@@ -99,22 +105,22 @@ void main(List<String> args) async {
 
   NotificationService notificationService = atClient.notificationService;
 
-  bool syncComplete = false;
-  void onSyncDone(syncResult) {
-    logger.info("syncResult.syncStatus: ${syncResult.syncStatus}");
-    logger.info("syncResult.lastSyncedOn ${syncResult.lastSyncedOn}");
-    syncComplete = true;
-  }
+  // bool syncComplete = false;
+  // void onSyncDone(syncResult) {
+  //   logger.info("syncResult.syncStatus: ${syncResult.syncStatus}");
+  //   logger.info("syncResult.lastSyncedOn ${syncResult.lastSyncedOn}");
+  //   syncComplete = true;
+  // }
 
-  // Wait for initial sync to complete
-  logger.info("Waiting for initial sync");
-  syncComplete = false;
-  // ignore: deprecated_member_use
-  atClient.syncService.sync(onDone: onSyncDone);
-  while (!syncComplete) {
-    await Future.delayed(Duration(milliseconds: 100));
-  }
-  logger.info("Initial sync complete");
+  // // Wait for initial sync to complete
+  // logger.info("Waiting for initial sync");
+  // syncComplete = false;
+  // // ignore: deprecated_member_use
+  // atClient.syncService.sync(onDone: onSyncDone);
+  // while (!syncComplete) {
+  //   await Future.delayed(Duration(milliseconds: 100));
+  // }
+  // logger.info("Initial sync complete");
 
   notificationService.subscribe(regex: 'stream@', shouldDecrypt: true).listen(((notification) async {
     print(notification.key);
