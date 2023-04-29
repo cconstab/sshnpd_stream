@@ -123,7 +123,7 @@ void main(List<String> args) async {
       .listen(((notification) async {
     if (notification.key.contains('stream')) {
       session = notification.value!;
-      forAtsign = notification.from!;
+      forAtsign = notification.from;
       var ports = await connectSpawn(0, 0, session, forAtsign, snoop);
       logger.warning('Setting stream session $session for $forAtsign using ports $ports');
       var metaData = Metadata()
