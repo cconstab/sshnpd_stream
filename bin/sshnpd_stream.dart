@@ -26,8 +26,7 @@ void main(List<String> args) async {
   logger.hierarchicalLoggingEnabled = true;
   logger.logger.level = Level.SHOUT;
 
-  var uuid = Uuid();
-  //String sessionId = uuid.v4();
+  String session = '';
   String atSign = 'unknown';
   String? homeDirectory = getHomeDirectory();
   dynamic results;
@@ -51,7 +50,9 @@ void main(List<String> args) async {
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
 
   parser.addFlag('snoop',
-      abbr: 's',defaultsTo: false, help: 'Snoop on traffic passing through service');
+      abbr: 's',
+      defaultsTo: false,
+      help: 'Snoop on traffic passing through service');
 
   try {
     // Arg check
@@ -103,7 +104,6 @@ void main(List<String> args) async {
     ..isLocalStoreRequired = true
     ..commitLogPath = '$homeDirectory/.stream/$atSign/storage/commitLog'
     ..fetchOfflineNotifications = false
-    //..cramSecret = '<your cram secret>';
     ..atKeysFilePath = atsignFile
     ..atProtocolEmitted = Version(2, 0, 0);
 
@@ -122,10 +122,10 @@ void main(List<String> args) async {
       .listen(((notification) async {
     print(notification.key);
     if (notification.key.contains('stream')) {
-      var ports = await connectSpawn(0, 0, snoop);
-
+      session = notification.value!;
+      var ports = await connectSpawn(0, 0, session, snoop);
       logger.warning(
-          'Setting stream session ${notification.value} for ${notification.from} using ports $ports');
+          'Setting stream session $session for ${notification.from} using ports $ports');
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
@@ -141,8 +141,7 @@ void main(List<String> args) async {
         ..metadata = metaData;
 
       String data = '$ipAddress,${ports[0]},${ports[1]}';
-      print(atKey.toString());
-      print(data);
+
       try {
         await atClient.notificationService.notify(
             NotificationParams.forUpdate(atKey, value: data),
@@ -157,7 +156,8 @@ void main(List<String> args) async {
   }));
 }
 
-Future<List<int>> connectSpawn(int portA, int portB, bool snoop) async {
+Future<List<int>> connectSpawn(
+    int portA, int portB, String session, bool snoop) async {
   /// Spawn an isolate, passing my receivePort sendPort
 
   ReceivePort myReceivePort = ReceivePort();
@@ -166,7 +166,7 @@ Future<List<int>> connectSpawn(int portA, int portB, bool snoop) async {
   SendPort mySendPort = await myReceivePort.first;
 
   myReceivePort = ReceivePort();
-  mySendPort.send([portA, portB, snoop, myReceivePort.sendPort]);
+  mySendPort.send([portA, portB, session, snoop, myReceivePort.sendPort]);
 
   List message = await myReceivePort.first as List;
 
@@ -177,8 +177,15 @@ Future<List<int>> connectSpawn(int portA, int portB, bool snoop) async {
 }
 
 Future<void> connect(SendPort mySendPort) async {
+  final AtSignLogger logger = AtSignLogger(' sshnp ');
+  logger.hierarchicalLoggingEnabled = true;
+
+  AtSignLogger.root_level = 'WARNING';
+  logger.logger.level = Level.WARNING;
+
   int portA = 0;
   int portB = 0;
+  String session;
   bool verbose = false;
   ReceivePort myReceivePort = ReceivePort();
   mySendPort.send(myReceivePort.sendPort);
@@ -186,8 +193,9 @@ Future<void> connect(SendPort mySendPort) async {
   List message = await myReceivePort.first as List;
   portA = message[0];
   portB = message[1];
-  verbose = message[2];
-  mySendPort = message[3];
+  session = message[2];
+  verbose = message[3];
+  mySendPort = message[4];
 
   SocketConnector socketStream = await SocketConnector.serverToServer(
     serverAddressA: InternetAddress.anyIPv4,
@@ -207,5 +215,7 @@ Future<void> connect(SendPort mySendPort) async {
   while (closed == false) {
     closed = await socketStream.closed();
   }
+
   print('Ports $portA & $portB closed');
+  logger.warning('Ending stream session $session using ports [$portA, $portB]' );
 }
