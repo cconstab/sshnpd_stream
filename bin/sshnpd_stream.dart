@@ -125,7 +125,8 @@ void main(List<String> args) async {
       session = notification.value!;
       forAtsign = notification.from;
       var ports = await connectSpawn(0, 0, session, forAtsign, snoop);
-      logger.warning('Setting stream session $session for $forAtsign using ports $ports');
+      logger.warning('Starting stream session $session for $forAtsign using ports $ports');
+
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
