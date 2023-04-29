@@ -120,7 +120,6 @@ void main(List<String> args) async {
   notificationService
       .subscribe(regex: 'stream@', shouldDecrypt: true)
       .listen(((notification) async {
-    print(notification.key);
     if (notification.key.contains('stream')) {
       session = notification.value!;
       var ports = await connectSpawn(0, 0, session, snoop);
