@@ -28,6 +28,7 @@ void main(List<String> args) async {
 
   String session = '';
   String atSign = 'unknown';
+  String forAtsign = '';
   String? homeDirectory = getHomeDirectory();
   dynamic results;
   String atsignFile;
@@ -122,9 +123,9 @@ void main(List<String> args) async {
       .listen(((notification) async {
     if (notification.key.contains('stream')) {
       session = notification.value!;
-      var ports = await connectSpawn(0, 0, session, snoop);
-      logger.warning(
-          'Setting stream session $session for ${notification.from} using ports $ports');
+      forAtsign = notification.from!;
+      var ports = await connectSpawn(0, 0, session, forAtsign, snoop);
+      logger.warning('Setting stream session $session for $forAtsign using ports $ports');
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
@@ -156,7 +157,7 @@ void main(List<String> args) async {
 }
 
 Future<List<int>> connectSpawn(
-    int portA, int portB, String session, bool snoop) async {
+    int portA, int portB, String session, String forAtsign, bool snoop) async {
   /// Spawn an isolate, passing my receivePort sendPort
 
   ReceivePort myReceivePort = ReceivePort();
@@ -165,7 +166,7 @@ Future<List<int>> connectSpawn(
   SendPort mySendPort = await myReceivePort.first;
 
   myReceivePort = ReceivePort();
-  mySendPort.send([portA, portB, session, snoop, myReceivePort.sendPort]);
+  mySendPort.send([portA, portB, session, forAtsign, snoop, myReceivePort.sendPort]);
 
   List message = await myReceivePort.first as List;
 
@@ -185,6 +186,7 @@ Future<void> connect(SendPort mySendPort) async {
   int portA = 0;
   int portB = 0;
   String session;
+  String forAtsign;
   bool verbose = false;
   ReceivePort myReceivePort = ReceivePort();
   mySendPort.send(myReceivePort.sendPort);
@@ -193,8 +195,9 @@ Future<void> connect(SendPort mySendPort) async {
   portA = message[0];
   portB = message[1];
   session = message[2];
-  verbose = message[3];
-  mySendPort = message[4];
+  forAtsign = message[3];
+  verbose = message[4];
+  mySendPort = message[5];
 
   SocketConnector socketStream = await SocketConnector.serverToServer(
     serverAddressA: InternetAddress.anyIPv4,
@@ -215,5 +218,6 @@ Future<void> connect(SendPort mySendPort) async {
     closed = await socketStream.closed();
   }
 
-  logger.warning('Ended stream session $session using ports [$portA, $portB]' );
+  logger.warning('Finished stream session $session for $forAtsign using ports [$portA, $portB]');
+
 }
