@@ -34,15 +34,24 @@ void main(List<String> args) async {
   String atsignFile;
   String ipAddress;
   String nameSpace = 'stream';
+  bool snoop = false;
 
   // Get the command line arguments to fill in the details
   var parser = ArgParser();
   // Basic arguments
   parser.addOption('key-file',
-      abbr: 'k', mandatory: false, help: 'Sending atSign\'s atKeys file if not in ~/.atsign/keys/');
-  parser.addOption('atsign', abbr: 'a', mandatory: true, help: 'atSign for service');
-  parser.addOption('ip', abbr: 'i', mandatory: true, help: 'IP address to send to clients');
+      abbr: 'k',
+      mandatory: false,
+      help: 'Sending atSign\'s atKeys file if not in ~/.atsign/keys/');
+  parser.addOption('atsign',
+      abbr: 'a', mandatory: true, help: 'atSign for service');
+  parser.addOption('ip',
+      abbr: 'i', mandatory: true, help: 'IP address to send to clients');
+
   parser.addFlag('verbose', abbr: 'v', help: 'More logging');
+
+  parser.addFlag('snoop',
+      abbr: 's',defaultsTo: false, help: 'Snoop on traffic passing through service');
 
   try {
     // Arg check
@@ -79,10 +88,11 @@ void main(List<String> args) async {
     AtSignLogger.root_level = 'INFO';
   }
 
-    AtServiceFactory? atServiceFactory;
+  snoop = results['snoop'];
 
-    atServiceFactory = ServiceFactoryWithNoOpSyncService();
+  AtServiceFactory? atServiceFactory;
 
+  atServiceFactory = ServiceFactoryWithNoOpSyncService();
 
   //onboarding preference builder can be used to set onboardingService parameters
   AtOnboardingPreference atOnboardingConfig = AtOnboardingPreference()
@@ -97,7 +107,9 @@ void main(List<String> args) async {
     ..atKeysFilePath = atsignFile
     ..atProtocolEmitted = Version(2, 0, 0);
 
-  AtOnboardingService onboardingService = AtOnboardingServiceImpl(atSign, atOnboardingConfig,atServiceFactory: atServiceFactory);
+  AtOnboardingService onboardingService = AtOnboardingServiceImpl(
+      atSign, atOnboardingConfig,
+      atServiceFactory: atServiceFactory);
 
   await onboardingService.authenticate();
 
@@ -105,29 +117,15 @@ void main(List<String> args) async {
 
   NotificationService notificationService = atClient.notificationService;
 
-  // bool syncComplete = false;
-  // void onSyncDone(syncResult) {
-  //   logger.info("syncResult.syncStatus: ${syncResult.syncStatus}");
-  //   logger.info("syncResult.lastSyncedOn ${syncResult.lastSyncedOn}");
-  //   syncComplete = true;
-  // }
-
-  // // Wait for initial sync to complete
-  // logger.info("Waiting for initial sync");
-  // syncComplete = false;
-  // // ignore: deprecated_member_use
-  // atClient.syncService.sync(onDone: onSyncDone);
-  // while (!syncComplete) {
-  //   await Future.delayed(Duration(milliseconds: 100));
-  // }
-  // logger.info("Initial sync complete");
-
-  notificationService.subscribe(regex: 'stream@', shouldDecrypt: true).listen(((notification) async {
+  notificationService
+      .subscribe(regex: 'stream@', shouldDecrypt: true)
+      .listen(((notification) async {
     print(notification.key);
     if (notification.key.contains('stream')) {
-      var ports = await connectSpawn(0, 0);
+      var ports = await connectSpawn(0, 0, snoop);
 
-      logger.warning('Setting stream session ${notification.value} for ${notification.from} using ports $ports');
+      logger.warning(
+          'Setting stream session ${notification.value} for ${notification.from} using ports $ports');
       var metaData = Metadata()
         ..isPublic = false
         ..isEncrypted = true
@@ -146,9 +144,10 @@ void main(List<String> args) async {
       print(atKey.toString());
       print(data);
       try {
-        await atClient.notificationService.notify(NotificationParams.forUpdate(atKey, value: data),waitForFinalDeliveryStatus: false,
-          checkForFinalDeliveryStatus: false);
-
+        await atClient.notificationService.notify(
+            NotificationParams.forUpdate(atKey, value: data),
+            waitForFinalDeliveryStatus: false,
+            checkForFinalDeliveryStatus: false);
       } catch (e) {
         stderr.writeln("Error writting session ${notification.value} atKey");
       }
@@ -158,7 +157,7 @@ void main(List<String> args) async {
   }));
 }
 
-Future<List<int>> connectSpawn(int portA, int portB) async {
+Future<List<int>> connectSpawn(int portA, int portB, bool snoop) async {
   /// Spawn an isolate, passing my receivePort sendPort
 
   ReceivePort myReceivePort = ReceivePort();
@@ -167,7 +166,7 @@ Future<List<int>> connectSpawn(int portA, int portB) async {
   SendPort mySendPort = await myReceivePort.first;
 
   myReceivePort = ReceivePort();
-  mySendPort.send([portA, portB, myReceivePort.sendPort]);
+  mySendPort.send([portA, portB, snoop, myReceivePort.sendPort]);
 
   List message = await myReceivePort.first as List;
 
@@ -180,20 +179,22 @@ Future<List<int>> connectSpawn(int portA, int portB) async {
 Future<void> connect(SendPort mySendPort) async {
   int portA = 0;
   int portB = 0;
+  bool verbose = false;
   ReceivePort myReceivePort = ReceivePort();
   mySendPort.send(myReceivePort.sendPort);
 
   List message = await myReceivePort.first as List;
   portA = message[0];
   portB = message[1];
-  mySendPort = message[2];
+  verbose = message[2];
+  mySendPort = message[3];
 
   SocketConnector socketStream = await SocketConnector.serverToServer(
     serverAddressA: InternetAddress.anyIPv4,
     serverAddressB: InternetAddress.anyIPv4,
     serverPortA: portA,
     serverPortB: portB,
-    verbose: true,
+    verbose: verbose,
   );
 
   portA = socketStream.senderPort()!;
