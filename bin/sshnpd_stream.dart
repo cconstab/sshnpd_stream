@@ -216,6 +216,5 @@ Future<void> connect(SendPort mySendPort) async {
     closed = await socketStream.closed();
   }
 
-  print('Ports $portA & $portB closed');
-  logger.warning('Ending stream session $session using ports [$portA, $portB]' );
+  logger.warning('Ended stream session $session using ports [$portA, $portB]' );
 }
